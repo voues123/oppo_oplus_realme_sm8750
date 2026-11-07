@@ -1,20 +1,21 @@
-name: OP13 SukiSU v4.3.0-r2 41150 KPM AK3
+name: OP13 SukiSU SUSFS 2.3 KPM AK3
 env:
   TZ: Asia/Shanghai
   ANDROID_VERSION: android15
   KERNEL_VERSION: '6.6'
   SUB_VERSION: '118'
   KERNEL_NAME: android15-8-g93e223c276e7-abogki500782043-4k
-  CCACHE_KEY: ccache-sukisu430r2-6.6.118
-  SUKISU_COMMIT: 645ef9860b9b7f900bb5d1b27e224f2c311d39c0
+  CCACHE_KEY: ccache-sukisu-builtin-susfs230-6.6.118
+  SUKISU_COMMIT: 1cfa57340590971cba7521ed536da8ebbedc5f0a
   KERNEL_SOURCE_COMMIT: 2a4726b11594dd57d0779d2685fad5c81e5ed553
-  KSU_BUILD_REF: release
+  KSU_BUILD_REF: builtin-susfs
   KSU_VERSION: '41150'
-  KSU_VERSION_FULL: v4.3.0-r2-645ef986@release
+  KSU_VERSION_FULL: v4.3.0-r2-1cfa5734@builtin-susfs
+  SUSFS_COMMIT: 3f6aae536724af0df3dfa15f932034d14a5dbc5c
 'on':
   push:
     branches:
-    - codex/op13-sukisu-4.3.0-r2-20261107
+    - codex/op13-sukisu-susfs-kpm-20261108
   workflow_dispatch: {}
 jobs:
   build:
@@ -126,22 +127,34 @@ jobs:
           echo "ccache缓存命中详情:"
           ccache -sv
         fi
-    - name: 集成图片同版本 SukiSU v4.3.0-r2
+    - name: 集成官方 SukiSU builtin 与 SUSFS
       id: ksu_version
       run: |
         set -euo pipefail
         cd kernel_workspace
         git clone --filter=blob:none https://github.com/SukiSU-Ultra/SukiSU-Ultra.git KernelSU
-        git -C KernelSU checkout --detach 645ef9860b9b7f900bb5d1b27e224f2c311d39c0
-        test "$(git -C KernelSU rev-parse HEAD)" = "645ef9860b9b7f900bb5d1b27e224f2c311d39c0"
+        git -C KernelSU checkout --detach 1cfa57340590971cba7521ed536da8ebbedc5f0a
+        test "$(git -C KernelSU rev-parse HEAD)" = "1cfa57340590971cba7521ed536da8ebbedc5f0a"
         echo "SUKISU_SOURCE_COMMIT=$(git -C KernelSU rev-parse HEAD)"
         test ! -e common/drivers/kernelsu
         ln -s ../../KernelSU/kernel common/drivers/kernelsu
         grep -q 'CONFIG_KSU.*kernelsu/' common/drivers/Makefile || printf '\nobj-$(CONFIG_KSU) += kernelsu/\n' >> common/drivers/Makefile
         grep -q 'source "drivers/kernelsu/Kconfig"' common/drivers/Kconfig || printf '\nsource "drivers/kernelsu/Kconfig"\n' >> common/drivers/Kconfig
+        git clone --filter=blob:none https://github.com/cctv18/susfs4oki.git -b oki-android15-6.6 susfs4oki
+        git -C susfs4oki checkout --detach 3f6aae536724af0df3dfa15f932034d14a5dbc5c
+        test "$(git -C susfs4oki rev-parse HEAD)" = "3f6aae536724af0df3dfa15f932034d14a5dbc5c"
+        cp susfs4oki/kernel_patches/fs/susfs.c common/fs/
+        cp susfs4oki/kernel_patches/include/linux/susfs*.h common/include/linux/
+        cd common
+        patch --batch --forward -p1 -F3 < ../susfs4oki/kernel_patches/50_add_susfs_in_gki-android15-6.6.patch
+        test -z "$(find fs include kernel security drivers -name '*.rej' -print -quit)"
+        grep -Fx '#define SUSFS_VERSION "v2.3.0"' include/linux/susfs.h
+        grep -q '^config KSU_SUSFS$' drivers/kernelsu/Kconfig
+        grep -q 'obj-$(CONFIG_KSU_SUSFS) += susfs.o' fs/Makefile
+        cd ../
         echo "KSUVER=41150" >> "$GITHUB_ENV"
         echo "ksuver=41150" >> "$GITHUB_OUTPUT"
-        echo 'ROOT_SOURCE=SukiSU-Ultra/SukiSU-Ultra; no BakaSU redirection'
+        echo 'ROOT_SOURCE=official SukiSU builtin; manager target v4.3.0-r2; SUSFS_INLINE_HOOK; no BakaSU'
     - name: 应用lz4 1.10.0 & zstd 1.5.7补丁
       if: 'true'
       run: |
@@ -168,12 +181,14 @@ jobs:
         cp -r ../SukiSU_patch/other/zram/lz4k/crypto/* ./crypto
         cp ../SukiSU_patch/other/zram/zram_patch/${{ env.KERNEL_VERSION }}/lz4kd.patch ./
         patch -p1 -F 3 < lz4kd.patch || true
-    - name: 配置 SukiSU Tracepoint 与内置 KPM
+    - name: 启用 SUSFS 全部功能与 KPM
       run: |
         set -euo pipefail
         cd kernel_workspace
         ./common/scripts/config --file ./common/arch/arm64/configs/gki_defconfig   -e KSU -e KPM -e KPROBES -e KRETPROBES -e HAVE_SYSCALL_TRACEPOINTS   -e EXT4_FS -e KALLSYMS -e KALLSYMS_ALL -e IKCONFIG -e IKCONFIG_PROC   -e CC_OPTIMIZE_FOR_PERFORMANCE -d CC_OPTIMIZE_FOR_SIZE   -e TMPFS_XATTR -e TMPFS_POSIX_ACL -d KSU_DEBUG -d KSU_DISABLE_MANAGER -d KSU_DISABLE_POLICY
         sed -i 's/check_defconfig//' ./common/build.config.gki
+
+        ./common/scripts/config --file ./common/arch/arm64/configs/gki_defconfig  -e KSU_SUSFS -e KSU_SUSFS_SUS_PATH -e KSU_SUSFS_SUS_MOUNT  -e KSU_SUSFS_SUS_KSTAT -e KSU_SUSFS_SPOOF_UNAME  -e KSU_SUSFS_ENABLE_LOG -e KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS  -e KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG -e KSU_SUSFS_OPEN_REDIRECT  -e KSU_SUSFS_SUS_MAP
     - name: 启用网络功能增强优化配置
       if: 'false'
       run: |
@@ -395,9 +410,9 @@ jobs:
         sudo rm -rf /usr/local/lib/android &
         sudo rm -rf /opt/ghc &
         sudo rm -rf /opt/hostedtoolcache/CodeQL &
-        make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="ld.lld" HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error KSU_VERSION=41150 KSU_VERSION_FULL=v4.3.0-r2-645ef986@release KSU_BUILD_REF=release gki_defconfig &&
+        make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="ld.lld" HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error KSU_VERSION=41150 KSU_VERSION_FULL=v4.3.0-r2-1cfa5734@builtin-susfs KSU_BUILD_REF=builtin-susfs gki_defconfig &&
         make -j$(nproc --all) LLVM=1 ARCH=arm64 O=out headers_install INSTALL_HDR_PATH="$(pwd)/out/usr" &&
-        make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="$(pwd)/cc-wrapper" LD="$(pwd)/ld-wrapper" HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error KSU_VERSION=41150 KSU_VERSION_FULL=v4.3.0-r2-645ef986@release KSU_BUILD_REF=release Image
+        make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="$(pwd)/cc-wrapper" LD="$(pwd)/ld-wrapper" HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error KSU_VERSION=41150 KSU_VERSION_FULL=v4.3.0-r2-1cfa5734@builtin-susfs KSU_BUILD_REF=builtin-susfs Image
 
         # 编译后时间劫持二次校验
         echo "--- 编译后环境时间: $(LD_PRELOAD=$PRELOAD_LIBS date) ---"
@@ -420,15 +435,16 @@ jobs:
         cd kernel_workspace/common
         test -s out/arch/arm64/boot/Image
         grep -q 'Linux/arm64 6.6.118' out/.config
-        for config in CONFIG_KSU=y CONFIG_KPM=y CONFIG_HMBIRD_SCHED=y CONFIG_KPROBES=y CONFIG_KRETPROBES=y CONFIG_MQ_IOSCHED_ADIOS=y CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y; do
+        for config in CONFIG_KSU=y CONFIG_KPM=y CONFIG_KSU_SUSFS=y CONFIG_KSU_SUSFS_SUS_PATH=y CONFIG_KSU_SUSFS_SUS_MOUNT=y CONFIG_KSU_SUSFS_SUS_KSTAT=y CONFIG_KSU_SUSFS_SPOOF_UNAME=y CONFIG_KSU_SUSFS_SUS_MAP=y CONFIG_HMBIRD_SCHED=y CONFIG_KPROBES=y CONFIG_KRETPROBES=y CONFIG_MQ_IOSCHED_ADIOS=y CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y; do
           grep -Fx "$config" out/.config
         done
         strings out/arch/arm64/boot/Image > out/image-strings.txt
         grep -m1 'Linux version 6.6.118' out/image-strings.txt
-        grep -Fx 'v4.3.0-r2-645ef986@release' out/image-strings.txt
+        grep -Fx 'v4.3.0-r2-1cfa5734@builtin-susfs' out/image-strings.txt
         grep -Fx 'com.sukisu.ultra' out/image-strings.txt
         grep -Fx '947ae944f3de4ed4c21a7e4f7953ecf351bfa2b36239da37a34111ad29993eef' out/image-strings.txt
-        grep -E 'ksu_syscall_hook_init|ksu_supercalls_init|sukisu_kpm_bridge|hmbird_ops_init' out/image-strings.txt
+        grep -E 'ksu_handle_setresuid|ksu_handle_execveat|susfs_init|sukisu_kpm_bridge|hmbird_ops_init' out/image-strings.txt
+        grep -Fx 'v2.3.0' out/image-strings.txt
     - name: 应用 SukiSU 官方 KPM ABI v2
       if: 'true'
       run: |
@@ -464,21 +480,22 @@ jobs:
         Device: OnePlus 13 / PJZ110 / SM8750
         Kernel: 6.6.118-android15-8-g93e223c276e7-abogki500782043-4k
         Kernel source commit: 2a4726b11594dd57d0779d2685fad5c81e5ed553
-        Root: SukiSU v4.3.0-r2 (41150), official main tracepoint/syscall redirect; built into Image
-        SukiSU source commit: 645ef9860b9b7f900bb5d1b27e224f2c311d39c0
-        SukiSU version identity: v4.3.0-r2-645ef986@release
+        Root: official SukiSU builtin; manager target v4.3.0-r2 (41150); SUSFS inline hooks; built into Image
+        SukiSU source commit: 1cfa57340590971cba7521ed536da8ebbedc5f0a
+        SukiSU version identity: v4.3.0-r2-1cfa5734@builtin-susfs
         Manager package: com.sukisu.ultra
         Manager certificate SHA256: 947ae944f3de4ed4c21a7e4f7953ecf351bfa2b36239da37a34111ad29993eef
         KPM: CONFIG_KPM=y; official SukiSU KernelPatch 0.14.0 ABI v2; no KPatch-Next/KPN module
         HMBIRD/FengChi: enabled
         O2: enabled
         ADIOS: enabled
-        SUSFS-inline/BakaSU integration: omitted to preserve official main hook model
+        SUSFS: v2.3.0; cctv18/susfs4oki commit 3f6aae536724af0df3dfa15f932034d14a5dbc5c; enabled and compiled into Image
+        Root branch change: official builtin/SUSFS_INLINE_HOOK, not the earlier main/Tracepoint build; no BakaSU
         Kernel suffix follows screenshot; compiled Image is custom, not the original OEM image
         Phone runtime/boot verification: not performed
         EOF
         sha256sum Image > Image.sha256
-        AK3_NAME=AK3_OnePlus13_6.6.118_SukiSU_v4.3.0-r2_41150_KPM.zip
+        AK3_NAME=AK3_OnePlus13_6.6.118_SukiSU_41150_SUSFS_2.3.0_KPM.zip
         zip -r "../$AK3_NAME" Image Image.sha256 kernel.config build-info.txt LICENSE META-INF anykernel.sh tools
         zip -z "../$AK3_NAME" < build-info.txt
         echo "ak3name=$AK3_NAME" >> "$GITHUB_OUTPUT"
@@ -491,6 +508,6 @@ jobs:
     - name: 上传 ZIP 工件
       uses: actions/upload-artifact@v4
       with:
-        name: OP13-6.6.118-SukiSU-4.3.0-r2-41150-KPM
+        name: OP13-6.6.118-SukiSU-SUSFS-2.3.0-KPM
         if-no-files-found: error
         path: ${{ github.workspace }}/kernel_workspace/${{ steps.create_zip.outputs.ak3name }}
