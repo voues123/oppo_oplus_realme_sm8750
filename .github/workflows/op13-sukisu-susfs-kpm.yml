@@ -147,7 +147,7 @@ jobs:
         cp susfs4oki/kernel_patches/include/linux/susfs*.h common/include/linux/
         cd common
         curl -fL "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/custom_patch/susfs230_6.6.118.patch" -o susfs-kernel.patch
-        echo '68a01e0be98fbe80bc54093ecbe114bb70642d6d5b1e8fac2a568d44f9a73300  susfs-kernel.patch' | sha256sum -c -
+        echo 'a8091cd1b20410e528790a25c43f792958e1c88f40c5d07fec570b1fa751222f  susfs-kernel.patch' | sha256sum -c -
         patch --batch --forward -p1 -F3 < susfs-kernel.patch
         test -z "$(find fs include kernel security drivers -name '*.rej' -print -quit)"
         grep -Fx '#define SUSFS_VERSION "v2.3.0"' include/linux/susfs.h
