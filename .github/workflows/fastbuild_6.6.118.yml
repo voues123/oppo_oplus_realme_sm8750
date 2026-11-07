@@ -493,4 +493,4 @@ jobs:
       with:
         name: OP13-6.6.118-SukiSU-4.3.0-r2-41150-KPM
         if-no-files-found: error
-        path: ${{ github.workspace }}/kernel_workspace/AnyKernel*.zip
+        path: ${{ github.workspace }}/kernel_workspace/${{ steps.create_zip.outputs.ak3name }}
