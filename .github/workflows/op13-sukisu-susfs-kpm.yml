@@ -150,7 +150,7 @@ jobs:
         echo '5c2c53b142e91d7d6a46859f6c1ac3c65e7ee90010acf06a4b2b635b6730ee36  susfs-kernel.patch' | sha256sum -c -
         patch --batch --forward -p1 -F3 < susfs-kernel.patch
         curl -fL "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/custom_patch/sukisu-susfs-selinux-compat.patch" -o susfs-selinux-compat.patch
-        echo '5e3141c5e0e86cbe4d0132c6b8c6ccccfa59bf86d9ab144fee4e68c86916e8e8  susfs-selinux-compat.patch' | sha256sum -c -
+        echo 'c3d03373987c8cd811b6289a3b8ad6381e533b1e1a57fed807d1dc722e4b29fb  susfs-selinux-compat.patch' | sha256sum -c -
         patch --batch --forward -p1 -F3 < susfs-selinux-compat.patch
         test -z "$(find fs include kernel security drivers -name '*.rej' -print -quit)"
         grep -q 'susfs_is_priority_uid_filtered' fs/susfs.c
