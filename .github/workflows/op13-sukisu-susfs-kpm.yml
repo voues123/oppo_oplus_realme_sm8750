@@ -149,8 +149,13 @@ jobs:
         curl -fL "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/custom_patch/susfs230_6.6.118.patch" -o susfs-kernel.patch
         echo '5c2c53b142e91d7d6a46859f6c1ac3c65e7ee90010acf06a4b2b635b6730ee36  susfs-kernel.patch' | sha256sum -c -
         patch --batch --forward -p1 -F3 < susfs-kernel.patch
+        curl -fL "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/custom_patch/sukisu-susfs-selinux-compat.patch" -o susfs-selinux-compat.patch
+        echo '5e3141c5e0e86cbe4d0132c6b8c6ccccfa59bf86d9ab144fee4e68c86916e8e8  susfs-selinux-compat.patch' | sha256sum -c -
+        patch --batch --forward -p1 -F3 < susfs-selinux-compat.patch
         test -z "$(find fs include kernel security drivers -name '*.rej' -print -quit)"
         grep -q 'susfs_is_priority_uid_filtered' fs/susfs.c
+        grep -q 'int susfs_add_sus_type' fs/susfs.c
+        grep -q 'int susfs_add_sus_avd_allowed_by_type' fs/susfs.c
         grep -q 'CMD_SUSFS_SET_PRIORITY_UID_FILTER' include/linux/susfs_def.h
         grep -Fx '#define SUSFS_VERSION "v2.3.0"' include/linux/susfs.h
         grep -q '^config KSU_SUSFS$' drivers/kernelsu/Kconfig
@@ -516,3 +521,4 @@ jobs:
         name: OP13-6.6.118-SukiSU-SUSFS-2.3.0-KPM
         if-no-files-found: error
         path: ${{ github.workspace }}/kernel_workspace/${{ steps.create_zip.outputs.ak3name }}
+
