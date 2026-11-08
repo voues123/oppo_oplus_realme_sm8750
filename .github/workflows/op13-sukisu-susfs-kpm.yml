@@ -148,7 +148,12 @@ jobs:
         cd common
         curl -fL "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/custom_patch/susfs230_6.6.118.patch" -o susfs-kernel.patch
         echo '5c2c53b142e91d7d6a46859f6c1ac3c65e7ee90010acf06a4b2b635b6730ee36  susfs-kernel.patch' | sha256sum -c -
-        git apply --verbose --whitespace=nowarn susfs-kernel.patch
+        patch --batch --forward --verbose -p1 -F3 < susfs-kernel.patch
+        patch_rc=$?
+        echo "SUSFS_PATCH_EXIT=$patch_rc"
+        find . -name '*.rej' -o -name '*.orig' -print
+        test "$patch_rc" -eq 0
+        test -z "$(find . -name '*.rej' -print -quit)"
         curl -fL "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/custom_patch/sukisu-susfs-selinux-compat.c" -o susfs-selinux-compat.c
         echo 'ee3c9b9b8d20434f59f687fbc2511107cc94751f2bcc1146c816caf3c675b990  susfs-selinux-compat.c' | sha256sum -c -
         curl -fL "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/tools/inject_susfs_selinux_compat.py" -o inject_susfs_selinux_compat.py
