@@ -13,9 +13,6 @@ env:
   KSU_VERSION_FULL: v4.3.0-r2-1cfa5734@builtin-susfs
   SUSFS_COMMIT: 3f6aae536724af0df3dfa15f932034d14a5dbc5c
 'on':
-  push:
-    branches:
-    - codex/op13-sukisu-susfs-kpm-20261108
   workflow_dispatch: {}
 jobs:
   build:
