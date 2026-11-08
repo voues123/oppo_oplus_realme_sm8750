@@ -150,7 +150,7 @@ jobs:
         echo '5c2c53b142e91d7d6a46859f6c1ac3c65e7ee90010acf06a4b2b635b6730ee36  susfs-kernel.patch' | sha256sum -c -
         patch --batch --forward -p1 -F3 < susfs-kernel.patch
         curl -fL "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/custom_patch/sukisu-susfs-selinux-compat.c" -o susfs-selinux-compat.c
-        echo 'fedacf0fc997b7a336031bffcfcb3b01bf4aa1983c97b467c3cfd61a13943eec  susfs-selinux-compat.c' | sha256sum -c -
+        echo 'ee3c9b9b8d20434f59f687fbc2511107cc94751f2bcc1146c816caf3c675b990  susfs-selinux-compat.c' | sha256sum -c -
         curl -fL "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/tools/inject_susfs_selinux_compat.py" -o inject_susfs_selinux_compat.py
         echo '41d28a638ce2b87f0d981c0d1a48a398e6dff5c4f6f7163b0286be9850530861  inject_susfs_selinux_compat.py' | sha256sum -c -
         python3 inject_susfs_selinux_compat.py susfs.c susfs-selinux-compat.c
